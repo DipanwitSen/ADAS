@@ -1,174 +1,153 @@
-!pip install wandb==0.15.0
-!wandb --version
 !pip install ultralytics
+# Import Essential Libraries
 import os
-import cv2
 import random
-import numpy as np
 import pandas as pd
-from tqdm import tqdm
-import shutil
-from shutil import copyfile
-import matplotlib.pyplot as plt
-from matplotlib import animation, rc
-rc('animation', html='jshtml')
 from PIL import Image
-import ultralytics
+import cv2
 from ultralytics import YOLO
-ultralytics.checks()
-!mkdir datasets
-!mkdir datasets/train
-!mkdir datasets/valid
-!mkdir datasets/test
+from IPython.display import Video
+import numpy as np  
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set(style='darkgrid')
+import pathlib
+import glob
+from tqdm.notebook import trange, tqdm
+import warnings
+warnings.filterwarnings('ignore')
+Image_dir = '/kaggle/input/cardetection/car/train/images'
 
-train_path='datasets/train/'
-valid_path='datasets/valid/'
-test_path='datasets/test/'
-ano_paths=[]
-for dirname, _, filenames in os.walk('/kaggle/input/traffic-signs-dataset-in-yolo-format/ts/ts'):
-    for filename in filenames:
-        ano_paths+=[(os.path.join(dirname, filename))]
-        
-n=600#len(ano_paths) 
-print(n)
-N=list(range(n))
-random.shuffle(N)
+num_samples = 9
+image_files = os.listdir(Image_dir)
 
-train_ratio = 0.7
-valid_ratio = 0.2
-test_ratio = 0.1
+# Randomly select num_samples images
+rand_images = random.sample(image_files, num_samples)
 
-train_size = int(train_ratio*n)
-valid_size = int(valid_ratio*n)
+fig, axes = plt.subplots(3, 3, figsize=(11, 11))
 
-train_i = N[:train_size]
-valid_i = N[train_size:train_size+valid_size]
-test_i = N[train_size+valid_size:]
+for i in range(num_samples):
+    image = rand_images[i]
+    ax = axes[i // 3, i % 3]
+    ax.imshow(plt.imread(os.path.join(Image_dir, image)))
+    ax.set_title(f'Image {i+1}')
+    ax.axis('off')
 
-print(train_i)
-print(valid_i)
-print(test_i)
-for i in train_i:
-    ano_path=ano_paths[i]
-    img_path=os.path.join('/kaggle/input/traffic-signs-dataset-in-yolo-format/ts/ts',
-                          ano_path.split('/')[-1][0:-4]+'.jpg')
-    try:
-        !cp {ano_path} {train_path}
-        !cp {img_path} {train_path}
-    except:
-        continue
-print(len(os.listdir(train_path)))
-for i in test_i:
-    ano_path=ano_paths[i]
-    img_path=os.path.join('/kaggle/input/traffic-signs-dataset-in-yolo-format/ts/ts',
-                          ano_path.split('/')[-1][0:-4]+'.jpg')
-    try:
-        !cp {ano_path} {test_path}
-        !cp {img_path} {test_path}
-    except:
-        continue
-print(len(os.listdir(test_path)))      
-import yaml
+plt.tight_layout()
+plt.show()
+# Get the size of the image
+image = cv2.imread("/kaggle/input/cardetection/car/train/images/00000_00000_00012_png.rf.23f94508dba03ef2f8bd187da2ec9c26.jpg")
+h, w, c = image.shape
+print(f"The image has dimensions {w}x{h} and {c} channels.")
+# Use a pretrained YOLOv8n model
+model = YOLO("yolov8n.pt") 
 
-data_yaml = dict(
-    train ='train',
-    val ='valid',
-    test='test',
-    nc =4,
-    names =['prohibitor','danger','mandatory','other']
-)
+# Use the model to detect object
+image = "/kaggle/input/cardetection/car/train/images/FisheyeCamera_1_00228_png.rf.e7c43ee9b922f7b2327b8a00ccf46a4c.jpg"
+result_predict = model.predict(source = image, imgsz=(416))
 
-with open('data.yaml', 'w') as outfile:
-    yaml.dump(data_yaml, outfile, default_flow_style=True)
-    
-%cat data.yaml
-names =['prohibitor','danger','mandatory','other']
-M=list(range(len(names)))
-class_map=dict(zip(M,names))
-model = YOLO("yolov8x.pt") 
-!yolo task=detect mode=train model=yolov8x.pt data=data.yaml epochs=12 imgsz=480
-paths2=[]
-for dirname, _, filenames in os.walk('/kaggle/working/runs/detect/train'):
-    for filename in filenames:
-        if filename[-4:]=='.jpg':
-            paths2+=[(os.path.join(dirname, filename))]
-paths2=sorted(paths2)
-for path in paths2:
-    image = Image.open(path)
-    image=np.array(image)
-    plt.figure(figsize=(20,10))
+# show results
+plot = result_predict[0].plot()
+plot = cv2.cvtColor(plot, cv2.COLOR_BGR2RGB)
+display(Image.fromarray(plot))
+# Build from YAML and transfer weights
+Final_model = YOLO('yolov8n.yaml').load('yolov8n.pt')  
+
+# Training The Final Model
+Result_Final_model = Final_model.train(data="/kaggle/input/cardetection/car/data.yaml",epochs=100, imgsz = 416, batch = 64 ,lr0=0.0001, dropout= 0.15, device = 0)
+
+list_of_metrics = ["P_curve.png","R_curve.png","confusion_matrix.png"]
+# Load the image
+for i in list_of_metrics:
+    image = cv2.imread(f'/kaggle/working/runs/detect/train/{i}')
+
+    # Create a larger figure
+    plt.figure(figsize=(16, 12))
+
+    # Display the image
     plt.imshow(image)
+
+    # Show the plot
     plt.show()
-  best_path0='runs/detect/train/weights/best.pt'
-source0='datasets/test'
-ppaths=[]
-for dirname, _, filenames in os.walk(source0):
-    for filename in filenames:
-        if filename[-4:]=='.jpg':
-            ppaths+=[(os.path.join(dirname, filename))]
-ppaths=sorted(ppaths)
-print(ppaths[0])
-print(len(ppaths))
-model2 = YOLO(best_path0)
-!yolo task=detect mode=predict model={best_path0} conf=0.5 source={source0}
-results = model2.predict(source0,conf=0.5)
-print(len(results))
-print((results[0].boxes.data))
-PBOX=pd.DataFrame(columns=range(6))
-for i in range(len(results)):
-    arri=pd.DataFrame(results[i].boxes.data.cpu().numpy()).astype(float)
-    path=ppaths[i]
-    file=path.split('/')[-1]
-    arri=arri.assign(file=file)
-    arri=arri.assign(i=i)
-    PBOX=pd.concat([PBOX,arri],axis=0)
-PBOX.columns=['x','y','x2','y2','confidence','class','file','i']
-display(PBOX)
-PBOX['class']=PBOX['class'].apply(lambda x: class_map[int(x)])
-PBOX=PBOX.reset_index(drop=True)
-display(PBOX)
-display(PBOX['class'].value_counts())
-def draw_box2(n0):
-    
-    ipath=ppaths[n0]
-    image=cv2.imread(ipath)
-    H,W=image.shape[0],image.shape[1]
-    file=ipath.split('/')[-1]
-    
-    if PBOX[PBOX['file']==file] is not None:
-        box=PBOX[PBOX['file']==file]
-        box=box.reset_index(drop=True)
-        #display(box)
+    Result_Final_model = pd.read_csv('/kaggle/working/runs/detect/train/results.csv')
+    Result_Final_model.tail(10)
+    # Read the results.csv file as a pandas dataframe
+Result_Final_model.columns = df.columns.str.strip()
 
-        for i in range(len(box)):
-            label=box.loc[i,'class']
-            x=int(box.loc[i,'x'])
-            y=int(box.loc[i,'y'])
-            x2=int(box.loc[i,'x2']) 
-            y2=int(box.loc[i,'y2'])
-            #print(label,x,y,x2,y2)
-            cv2.putText(image, f'{label}', (x, int(y-4)), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0),2)
-            cv2.rectangle(image,(x,y),(x2,y2),(0,255,0),2) #green
-    
-    #plt.imshow(image)
-    #plt.show()   
-    
-    return image
-  def create_animation(ims):
-    fig=plt.figure(figsize=(12,8))
-    im=plt.imshow(cv2.cvtColor(ims[0],cv2.COLOR_BGR2RGB))
-    text = plt.text(0.05, 0.05, f'Slide {0}', transform=fig.transFigure, fontsize=14, color='blue')
-    plt.axis('off')
-    plt.close()
+# Create subplots
+fig, axs = plt.subplots(nrows=5, ncols=2, figsize=(15, 15))
 
-    def animate_func(i):
-        im.set_array(cv2.cvtColor(ims[i],cv2.COLOR_BGR2RGB))
-        text.set_text(f'Slide {i}')        
-        return [im]    
-    
-    return animation.FuncAnimation(fig, animate_func, frames=len(ims), interval=1000)
-    images2=[]
-for i in tqdm(range(len(ppaths))):
-    images2+=[draw_box2(i)]
-  create_animation(images2)
+# Plot the columns using seaborn
+sns.lineplot(x='epoch', y='train/box_loss', data=df, ax=axs[0,0])
+sns.lineplot(x='epoch', y='train/cls_loss', data=df, ax=axs[0,1])
+sns.lineplot(x='epoch', y='train/dfl_loss', data=df, ax=axs[1,0])
+sns.lineplot(x='epoch', y='metrics/precision(B)', data=df, ax=axs[1,1])
+sns.lineplot(x='epoch', y='metrics/recall(B)', data=df, ax=axs[2,0])
+sns.lineplot(x='epoch', y='metrics/mAP50(B)', data=df, ax=axs[2,1])
+sns.lineplot(x='epoch', y='metrics/mAP50-95(B)', data=df, ax=axs[3,0])
+sns.lineplot(x='epoch', y='val/box_loss', data=df, ax=axs[3,1])
+sns.lineplot(x='epoch', y='val/cls_loss', data=df, ax=axs[4,0])
+sns.lineplot(x='epoch', y='val/dfl_loss', data=df, ax=axs[4,1])
+
+# Set titles and axis labels for each subplot
+axs[0,0].set(title='Train Box Loss')
+axs[0,1].set(title='Train Class Loss')
+axs[1,0].set(title='Train DFL Loss')
+axs[1,1].set(title='Metrics Precision (B)')
+axs[2,0].set(title='Metrics Recall (B)')
+axs[2,1].set(title='Metrics mAP50 (B)')
+axs[3,0].set(title='Metrics mAP50-95 (B)')
+axs[3,1].set(title='Validation Box Loss')
+axs[4,0].set(title='Validation Class Loss')
+axs[4,1].set(title='Validation DFL Loss')
+
+
+plt.suptitle('Training Metrics and Loss', fontsize=24)
+plt.subplots_adjust(top=0.8)
+plt.tight_layout()
+plt.show()
+# Loading the best performing model
+Valid_model = YOLO('/kaggle/working/runs/detect/train/weights/best.pt')
+
+# Evaluating the model on the testset
+metrics = Valid_model.val(split = 'test')
+# final results 
+print("precision(B): ", metrics.results_dict["metrics/precision(B)"])
+print("metrics/recall(B): ", metrics.results_dict["metrics/recall(B)"])
+print("metrics/mAP50(B): ", metrics.results_dict["metrics/mAP50(B)"])
+print("metrics/mAP50-95(B): ", metrics.results_dict["metrics/mAP50-95(B)"])
+# Path to the directory containing the images
+image_dir = '/kaggle/input/cardetection/car/test/images'  
+
+# Get a list of all image files in the directory
+image_files = [os.path.join(image_dir, file) for file in os.listdir(image_dir) if file.endswith('.jpg')]
+
+# Randomly select 10 images from the directory
+random_images = random.sample(image_files, k=10)
+
+for image_path in random_images:
+    image = cv2.imread(image_path)  # Replace with your preferred method of reading the image
+    results = Final_model.predict([image], save=True, imgsz=416, conf=0.5, iou=0.7)
+    #results.append(result)
+# View results
+for i in range(2,12):
+    plt.imshow(plt.imread(f'/kaggle/working/runs/detect/train{i}/image0.jpg'))
+    plt.show()
+# Export the model
+video_model.export(format='onnx')
+# Convert mp4
+!ffmpeg -y -loglevel panic -i /kaggle/input/cardetection/video.mp4 output.mp4
+
+# Display the video
+Video("output.mp4", width=960)
+# Load a pr-trained model
+video_model = YOLO("yolov8n.pt")
+ 
+# Use the model to detect signs
+video_model.predict(source="/kaggle/input/cardetection/video.mp4", show=True, save = True)
+# show result
+# Convert format
+!ffmpeg -y -loglevel panic -i /kaggle/working/runs/detect/predict/video.avi result_out.mp4
+
+# Display the video 
+Video("result_out.mp4", width=960)

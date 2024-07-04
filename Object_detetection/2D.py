@@ -2,7 +2,7 @@ import cv2
 import math
 import time
 import os
-from ultralytics import YOLO
+import ultralytics as YOLO
 
 # Parameters
 objHeight = 1.0  # Actual height of the object in meters

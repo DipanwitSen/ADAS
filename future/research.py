@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 from ultralytics import YOLO
 
 # Function to draw the predicted future path on the frame
@@ -9,20 +10,24 @@ def draw_future_path(frame, a, b):
     # Hyperbola with horizontal transverse axis
     for x in range(a, frame.shape[1], 10):
         try:
-            y1 = b + np.sqrt((x - a)**2 * k**2 / h**2 - k**2)
-            y2 = b - np.sqrt((x - a)**2 * k**2 / h**2 - k**2)
-            cv2.circle(frame, (int(x), int(y1)), 2, (0, 255, 0), -1)
-            cv2.circle(frame, (int(x), int(y2)), 2, (0, 255, 0), -1)
+            value = (x - a) ** 2 * k ** 2 / h ** 2 - k ** 2
+            if value >= 0:
+                y1 = b + np.sqrt(value)
+                y2 = b - np.sqrt(value)
+                cv2.circle(frame, (int(x), int(y1)), 2, (0, 255, 0), -1)
+                cv2.circle(frame, (int(x), int(y2)), 2, (0, 255, 0), -1)
         except ValueError:
             continue
 
     # Hyperbola with vertical transverse axis
     for y in range(b, frame.shape[0], 10):
         try:
-            x1 = a + np.sqrt((y - b)**2 * h**2 / k**2 - h**2)
-            x2 = a - np.sqrt((y - b)**2 * h**2 / k**2 - h**2)
-            cv2.circle(frame, (int(x1), int(y)), 2, (0, 255, 0), -1)
-            cv2.circle(frame, (int(x2), int(y)), 2, (0, 255, 0), -1)
+            value = (y - b) ** 2 * h ** 2 / k ** 2 - h ** 2
+            if value >= 0:
+                x1 = a + np.sqrt(value)
+                x2 = a - np.sqrt(value)
+                cv2.circle(frame, (int(x1), int(y)), 2, (0, 255, 0), -1)
+                cv2.circle(frame, (int(x2), int(y)), 2, (0, 255, 0), -1)
         except ValueError:
             continue
 
@@ -30,20 +35,24 @@ def draw_future_path(frame, a, b):
     p = 50  # Assumed distance for demonstration purposes
     for x in range(a, frame.shape[1], 10):
         try:
-            y1 = b + np.sqrt(4 * p * (x - a))
-            y2 = b - np.sqrt(4 * p * (x - a))
-            cv2.circle(frame, (int(x), int(y1)), 2, (0, 255, 0), -1)
-            cv2.circle(frame, (int(x), int(y2)), 2, (0, 255, 0), -1)
+            value = 4 * p * (x - a)
+            if value >= 0:
+                y1 = b + np.sqrt(value)
+                y2 = b - np.sqrt(value)
+                cv2.circle(frame, (int(x), int(y1)), 2, (0, 255, 0), -1)
+                cv2.circle(frame, (int(x), int(y2)), 2, (0, 255, 0), -1)
         except ValueError:
             continue
 
     # Parabola with vertical axis
     for y in range(b, frame.shape[0], 10):
         try:
-            x1 = a + np.sqrt(4 * p * (y - b))
-            x2 = a - np.sqrt(4 * p * (y - b))
-            cv2.circle(frame, (int(x1), int(y)), 2, (0, 255, 0), -1)
-            cv2.circle(frame, (int(x2), int(y)), 2, (0, 255, 0), -1)
+            value = 4 * p * (y - b)
+            if value >= 0:
+                x1 = a + np.sqrt(value)
+                x2 = a - np.sqrt(value)
+                cv2.circle(frame, (int(x1), int(y)), 2, (0, 255, 0), -1)
+                cv2.circle(frame, (int(x2), int(y)), 2, (0, 255, 0), -1)
         except ValueError:
             continue
 
@@ -65,7 +74,9 @@ def lagrange_interpolation(x, y, x_pred):
         L = 1
         for j in range(n):
             if i != j:
-                L *= (x_pred - x[j]) / (x[i] - x[j])
+                denominator = (x[i] - x[j])
+                if denominator != 0:
+                    L *= (x_pred - x[j]) / denominator
         y_pred += y[i] * L
     return y_pred
 
@@ -73,7 +84,11 @@ def lagrange_interpolation(x, y, x_pred):
 def newton_raphson(f, df, x0, tol=1e-6, max_iter=100):
     x = x0
     for i in range(max_iter):
-        x_new = x - f(x) / df(x)
+        f_value = f(x)
+        df_value = df(x)
+        if df_value == 0:
+            break
+        x_new = x - f_value / df_value
         if abs(x_new - x) < tol:
             return x_new
         x = x_new

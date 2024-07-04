@@ -2,7 +2,8 @@ import cv2
 import math
 import time
 import os
-import ultralytics as YOLO
+import numpy as np
+from ultralytics import YOLO
 
 # Parameters
 objHeight = 1.0  # Actual height of the object in meters
@@ -11,9 +12,8 @@ focalLength = 480  # Focal length of the camera in pixels
 classNames = ["person", "bicycle", "car", "motorbike", "bus", "truck"]
 confThreshold = 0.5
 nmsThreshold = 0.4
-
 # Initialize YOLO model
-model = YOLO("yolo-Weights/yolov8x.pt")
+model = YOLO("yolov8n.pt")
 
 # Output directory
 output_dir = "C:\\Users\\KIIT\\Desktop\\intel\\webapp\\output"
@@ -74,7 +74,8 @@ def process_frame(img):
 
             cv2.putText(img, f"Speed: {speed} m/s", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.putText(img, f"Distance: {distance} m", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.putText(img, f"Time to Collision: {time_to_collision} s", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(img, f"Time to Collision: {time_to_collision} s", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                        (0, 255, 0), 2)
 
     return img
 
@@ -82,29 +83,25 @@ def process_webcam():
     cap = cv2.VideoCapture(0)
     cap.set(3, 640)
     cap.set(4, 480)
-    
-    fourcc_avi = cv2.VideoWriter_fourcc(*'XVID')
+
+
     fourcc_mp4 = cv2.VideoWriter_fourcc(*'mp4v')
-    output_path_avi = os.path.join(output_dir, "webcam_output.avi")
     output_path_mp4 = os.path.join(output_dir, "webcam_output.mp4")
-    out_avi = cv2.VideoWriter(output_path_avi, fourcc_avi, 20.0, (640, 480))
     out_mp4 = cv2.VideoWriter(output_path_mp4, fourcc_mp4, 20.0, (640, 480))
-    
+
     while True:
         success, img = cap.read()
         if not success:
             break
         img = process_frame(img)
-        out_avi.write(img)
         out_mp4.write(img)
         cv2.imshow('Webcam', img)
         if cv2.waitKey(1) == ord('q'):
             break
     cap.release()
-    out_avi.release()
     out_mp4.release()
     cv2.destroyAllWindows()
-    print(f"Processed webcam video saved to: {output_path_avi} and {output_path_mp4}")
+    print(f"Processed webcam video saved to: {output_path_mp4}")
 
 def process_image(image_path):
     img = cv2.imread(image_path)
@@ -118,28 +115,23 @@ def process_image(image_path):
 
 def process_video(video_path):
     cap = cv2.VideoCapture(video_path)
-    fourcc_avi = cv2.VideoWriter_fourcc(*'XVID')
     fourcc_mp4 = cv2.VideoWriter_fourcc(*'mp4v')
-    output_path_avi = os.path.join(output_dir, os.path.basename(video_path).replace('.mp4', '_output.avi'))
     output_path_mp4 = os.path.join(output_dir, os.path.basename(video_path).replace('.avi', '_output.mp4'))
-    out_avi = cv2.VideoWriter(output_path_avi, fourcc_avi, 20.0, (640, 480))
     out_mp4 = cv2.VideoWriter(output_path_mp4, fourcc_mp4, 20.0, (640, 480))
-    
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
         frame = process_frame(frame)
-        out_avi.write(frame)
         out_mp4.write(frame)
         cv2.imshow('Video', frame)
         if cv2.waitKey(1) == ord('q'):
             break
     cap.release()
-    out_avi.release()
     out_mp4.release()
     cv2.destroyAllWindows()
-    print(f"Processed video saved to: {output_path_avi} and {output_path_mp4}")
+    print(f"Processed video saved to:  {output_path_mp4}")
 
 def main():
     choice = input("Choose input type (webcam, image, video): ").strip().lower()

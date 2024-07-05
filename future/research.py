@@ -1,10 +1,30 @@
 import cv2
 import numpy as np
-import time
 from ultralytics import YOLO
+import random
+
+# Initialize Kalman Filter
+def initialize_kalman():
+    kalman = cv2.KalmanFilter(4, 2)
+    kalman.measurementMatrix = np.array([[1, 0, 0, 0],
+                                         [0, 1, 0, 0]], np.float32)
+    kalman.transitionMatrix = np.array([[1, 0, 1, 0],
+                                        [0, 1, 0, 1],
+                                        [0, 0, 1, 0],
+                                        [0, 0, 0, 1]], np.float32)
+    kalman.processNoiseCov = np.array([[1, 0, 0, 0],
+                                       [0, 1, 0, 0],
+                                       [0, 0, 5, 0],
+                                       [0, 0, 0, 5]], np.float32) * 0.03
+    return kalman
 
 # Function to draw the predicted future path on the frame
-def draw_future_path(frame, a, b):
+def draw_future_path(frame, path):
+    for (x, y) in path:
+        cv2.circle(frame, (int(x), int(y)), 2, (0, 255, 0), -1)
+
+# Function to draw parabolic and hyperbolic paths
+def draw_parabolic_hyperbolic_paths(frame, a, b):
     h, k = 100, 100  # Assumed distances for demonstration purposes
 
     # Hyperbola with horizontal transverse axis
@@ -61,38 +81,39 @@ def detect_object_yolo(frame, model):
     results = model.predict(source=frame, save=False, imgsz=640, conf=0.25)
     if len(results) > 0 and len(results[0].boxes) > 0:
         box = results[0].boxes[0]
-        cX = int((box.xyxy[0][0] + box.xyxy[0][2]) / 2)
-        cY = int((box.xyxy[0][1] + box.xyxy[0][3]) / 2)
-        return np.array([cX, cY])
-    return None
+        x1, y1, x2, y2 = int(box.xyxy[0][0]), int(box.xyxy[0][1]), int(box.xyxy[0][2]), int(box.xyxy[0][3])
+        cX = int((x1 + x2) / 2)
+        cY = int((y1 + y2) / 2)
+        return np.array([cX, cY]), (x1, y1, x2, y2)
+    return None, None
 
-# Lagrange Interpolation function
-def lagrange_interpolation(x, y, x_pred):
-    n = len(x)
-    y_pred = 0
-    for i in range(n):
-        L = 1
-        for j in range(n):
-            if i != j:
-                denominator = (x[i] - x[j])
-                if denominator != 0:
-                    L *= (x_pred - x[j]) / denominator
-        y_pred += y[i] * L
-    return y_pred
+# Function to add uncertainty to the future predictions
+def add_uncertainty(value, uncertainty):
+    return value + random.uniform(-uncertainty, uncertainty)
 
-# Newton-Raphson method
-def newton_raphson(f, df, x0, tol=1e-6, max_iter=100):
-    x = x0
-    for i in range(max_iter):
-        f_value = f(x)
-        df_value = df(x)
-        if df_value == 0:
-            break
-        x_new = x - f_value / df_value
-        if abs(x_new - x) < tol:
-            return x_new
-        x = x_new
-    return x
+# Generate multiple future paths based on environmental factors
+def generate_future_paths(a, b, num_paths=10):
+    paths = []
+    for _ in range(num_paths):
+        path = []
+        x, y = a, b
+        for _ in range(100):  # Assume 100 future points
+            x = add_uncertainty(x + 10, 5)  # 10 units ahead with 5 units uncertainty
+            y = add_uncertainty(y, 5)  # 5 units uncertainty in y-axis
+            # Add environmental factors here (e.g., gravity, friction)
+            y += 1  # Simulating gravity effect
+            path.append((x, y))
+        paths.append(path)
+    return paths
+
+# Function to merge paths into a single path
+def merge_paths(paths):
+    merged_path = []
+    for i in range(len(paths[0])):
+        avg_x = np.mean([path[i][0] for path in paths])
+        avg_y = np.mean([path[i][1] for path in paths])
+        merged_path.append((avg_x, avg_y))
+    return merged_path
 
 # Input setup
 print("Choose input method:")
@@ -112,37 +133,34 @@ elif choice == 3:
 # Load YOLOv8 model
 model = YOLO("yolov8n.pt")
 
-# Lists to store detected positions
-x_positions = []
-y_positions = []
+# Initialize Kalman filter
+kalman = initialize_kalman()
 
 def process_frame(frame):
-    measured = detect_object_yolo(frame, model)
+    measured, bbox = detect_object_yolo(frame, model)
     if measured is not None:
-        # Get the center (a, b) of the detected object
-        a, b = measured
-        x_positions.append(a)
-        y_positions.append(b)
-        # Draw the detected object center
-        cv2.circle(frame, (a, b), 5, (0, 0, 255), -1)
+        # Draw bounding box
+        x1, y1, x2, y2 = bbox
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
-        # Lagrange interpolation for future points
-        if len(x_positions) > 2:
-            x_pred = a + 10  # Predict next point
-            y_pred = lagrange_interpolation(x_positions, y_positions, x_pred)
-            # Draw the Lagrange interpolated point
-            cv2.circle(frame, (int(x_pred), int(y_pred)), 5, (255, 0, 0), -1)
+        # Kalman filter prediction and correction
+        predicted = kalman.predict()
+        kalman.correct(np.array([[np.float32(measured[0])], [np.float32(measured[1])]]))
 
-            # Refine prediction with Newton-Raphson method
-            f = lambda x: lagrange_interpolation(x_positions, y_positions, x) - y_pred
-            df = lambda x: (f(x + 1e-5) - f(x)) / 1e-5  # Numerical derivative
-            refined_x_pred = newton_raphson(f, df, x_pred)
-            refined_y_pred = lagrange_interpolation(x_positions, y_positions, refined_x_pred)
-            # Draw the Newton-Raphson refined point
-            cv2.circle(frame, (int(refined_x_pred), int(refined_y_pred)), 5, (0, 255, 255), -1)
+        # Get the predicted position (a, b) from the Kalman filter
+        a, b = int(predicted[0, 0]), int(predicted[1, 0])
 
-        # Draw the predicted future path using all equations
-        draw_future_path(frame, a, b)
+        # Generate multiple future paths
+        paths = generate_future_paths(a, b)
+
+        # Merge the paths into a single predicted path
+        merged_path = merge_paths(paths)
+
+        # Draw the merged path
+        draw_future_path(frame, merged_path)
+
+        # Draw parabolic and hyperbolic paths for visual reference
+        draw_parabolic_hyperbolic_paths(frame, a, b)
 
     return frame
 

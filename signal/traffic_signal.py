@@ -1,153 +1,150 @@
-!pip install ultralytics
-# Import Essential Libraries
+import numpy as np
 import os
-import random
-import pandas as pd
-from PIL import Image
-import cv2
-from ultralytics import YOLO
-from IPython.display import Video
-import numpy as np  
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set(style='darkgrid')
-import pathlib
 import glob
-from tqdm.notebook import trange, tqdm
-import warnings
-warnings.filterwarnings('ignore')
-Image_dir = '/kaggle/input/cardetection/car/train/images'
-
-num_samples = 9
-image_files = os.listdir(Image_dir)
-
-# Randomly select num_samples images
-rand_images = random.sample(image_files, num_samples)
-
-fig, axes = plt.subplots(3, 3, figsize=(11, 11))
-
-for i in range(num_samples):
-    image = rand_images[i]
-    ax = axes[i // 3, i % 3]
-    ax.imshow(plt.imread(os.path.join(Image_dir, image)))
-    ax.set_title(f'Image {i+1}')
-    ax.axis('off')
-
-plt.tight_layout()
+import matplotlib.pyplot as plt
+from skimage import color, exposure, transform, io
+NUM_CLASSES = 43
+IMG_SIZE = 48
+TRAINING_PATH = 'data/traffic_sign_dataset/Final_Training/Images/'
+TEST_PATH = 'data/traffic_sign_dataset/Final_Test/Images/'
+BATCH_SIZE = 32
+EPOCHS = 30
+def correct_all_paths(img_paths):
+    new_paths = []
+    for path in img_paths:
+        path = path.replace('\\', '/')
+        new_paths.append(path)
+    return new_paths
+img_paths = glob.glob(os.path.join(TRAINING_PATH, '*/*.ppm'))
+img_paths = correct_all_paths(img_paths)
+np.random.shuffle(img_paths)
+for i in range(0, 9):
+    plt.subplot(330 + 1 + i)
+    plt.imshow(io.imread(img_paths[i], cmap=plt.get_cmap('gray')))
+#Show the plot
 plt.show()
-# Get the size of the image
-image = cv2.imread("/kaggle/input/cardetection/car/train/images/00000_00000_00012_png.rf.23f94508dba03ef2f8bd187da2ec9c26.jpg")
-h, w, c = image.shape
-print(f"The image has dimensions {w}x{h} and {c} channels.")
-# Use a pretrained YOLOv8n model
-model = YOLO("yolov8n.pt") 
+def preprocess_images(img):
+    # return image in HSV format
+    hsv = color.rgb2hsv(img)
+    # return image after histogram equilization
+    hsv[:, :, 2] = exposure.equalize_hist(hsv[:, :, 2])
+    img = color.hsv2rgb(hsv)
+    
+    # resizing image to fixed dimension
+    min_side = min(img.shape[:-1])
+    center =img.shape[0] // 2, img.shape[1] // 2
+    img = img[center[0] - min_side // 2: center[0] + min_side // 2,
+              center[1] - min_side // 2: center[0] + min_side // 2,
+              :]
+    img = transform.resize(img,(IMG_SIZE, IMG_SIZE), mode = 'constant')
 
-# Use the model to detect object
-image = "/kaggle/input/cardetection/car/train/images/FisheyeCamera_1_00228_png.rf.e7c43ee9b922f7b2327b8a00ccf46a4c.jpg"
-result_predict = model.predict(source = image, imgsz=(416))
-
-# show results
-plot = result_predict[0].plot()
-plot = cv2.cvtColor(plot, cv2.COLOR_BGR2RGB)
-display(Image.fromarray(plot))
-# Build from YAML and transfer weights
-Final_model = YOLO('yolov8n.yaml').load('yolov8n.pt')  
-
-# Training The Final Model
-Result_Final_model = Final_model.train(data="/kaggle/input/cardetection/car/data.yaml",epochs=100, imgsz = 416, batch = 64 ,lr0=0.0001, dropout= 0.15, device = 0)
-
-list_of_metrics = ["P_curve.png","R_curve.png","confusion_matrix.png"]
-# Load the image
-for i in list_of_metrics:
-    image = cv2.imread(f'/kaggle/working/runs/detect/train/{i}')
-
-    # Create a larger figure
-    plt.figure(figsize=(16, 12))
-
-    # Display the image
-    plt.imshow(image)
-
-    # Show the plot
-    plt.show()
-    Result_Final_model = pd.read_csv('/kaggle/working/runs/detect/train/results.csv')
-    Result_Final_model.tail(10)
-    # Read the results.csv file as a pandas dataframe
-Result_Final_model.columns = df.columns.str.strip()
-
-# Create subplots
-fig, axs = plt.subplots(nrows=5, ncols=2, figsize=(15, 15))
-
-# Plot the columns using seaborn
-sns.lineplot(x='epoch', y='train/box_loss', data=df, ax=axs[0,0])
-sns.lineplot(x='epoch', y='train/cls_loss', data=df, ax=axs[0,1])
-sns.lineplot(x='epoch', y='train/dfl_loss', data=df, ax=axs[1,0])
-sns.lineplot(x='epoch', y='metrics/precision(B)', data=df, ax=axs[1,1])
-sns.lineplot(x='epoch', y='metrics/recall(B)', data=df, ax=axs[2,0])
-sns.lineplot(x='epoch', y='metrics/mAP50(B)', data=df, ax=axs[2,1])
-sns.lineplot(x='epoch', y='metrics/mAP50-95(B)', data=df, ax=axs[3,0])
-sns.lineplot(x='epoch', y='val/box_loss', data=df, ax=axs[3,1])
-sns.lineplot(x='epoch', y='val/cls_loss', data=df, ax=axs[4,0])
-sns.lineplot(x='epoch', y='val/dfl_loss', data=df, ax=axs[4,1])
-
-# Set titles and axis labels for each subplot
-axs[0,0].set(title='Train Box Loss')
-axs[0,1].set(title='Train Class Loss')
-axs[1,0].set(title='Train DFL Loss')
-axs[1,1].set(title='Metrics Precision (B)')
-axs[2,0].set(title='Metrics Recall (B)')
-axs[2,1].set(title='Metrics mAP50 (B)')
-axs[3,0].set(title='Metrics mAP50-95 (B)')
-axs[3,1].set(title='Validation Box Loss')
-axs[4,0].set(title='Validation Class Loss')
-axs[4,1].set(title='Validation DFL Loss')
-
-
-plt.suptitle('Training Metrics and Loss', fontsize=24)
-plt.subplots_adjust(top=0.8)
-plt.tight_layout()
+    return img
+def get_class(img_path):
+    return int(img_path.split('/')[-2])
+images = []
+labels = []
+for img_path in img_paths:
+    img = preprocess_images(io.imread(img_path))
+    label = get_class(img_path)
+    images.append(img)
+    labels.append(label)
+X = np.array(images, dtype = 'float32')
+Y = np.eye(NUM_CLASSES, dtype = 'uint8')[labels]
+for i in range(0, 9):
+    plt.subplot(330 + 1 + i)
+    plt.imshow(images[i], cmap=plt.get_cmap('gray'))
+#Show the plot
 plt.show()
-# Loading the best performing model
-Valid_model = YOLO('/kaggle/working/runs/detect/train/weights/best.pt')
+from keras.models import Sequential
+from keras.layers.core import Dropout, Dense, Activation, Flatten
+from keras.layers.convolutional import Conv2D
+from keras.layers.pooling import MaxPooling2D
+from keras.optimizers import SGD
+def build_cnn_model():
+    model = Sequential() 
+    model.add(Conv2D(32, (3, 3), padding ='same', input_shape = (IMG_SIZE, IMG_SIZE, 3), activation = 'relu'))
+    model.add(Conv2D(32, (3, 3), activation = 'relu'))
+    model.add(MaxPooling2D(pool_size = (2, 2)))
+    model.add(Dropout(0.2))
+    
+    model.add(Conv2D(64, (3, 3), padding ='same', activation = 'relu'))
+    model.add(Conv2D(64, (3, 3), activation = 'relu'))
+    model.add(MaxPooling2D(pool_size = (2, 2)))
+    model.add(Dropout(0.2))
+    
+    model.add(Conv2D(128, (3, 3), padding ='same', activation = 'relu'))
+    model.add(Conv2D(128, (3, 3), activation = 'relu'))
+    model.add(MaxPooling2D(pool_size = (2, 2)))
+    model.add(Dropout(0.2))
+    
+    model.add(Flatten())
+    model.add(Dense(512, activation = 'relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(NUM_CLASSES, activation = 'softmax'))
+    return model
+    model = build_cnn_model()
+lr = 0.01
+sgd = SGD(lr = lr, decay = 1e-6, momentum = 0.9, nesterov = True) 
+model.compile(loss = 'categorical_crossentropy', optimizer = sgd, metrics = ['accuracy'])
+from keras.callbacks import LearningRateScheduler, ModelCheckpoint, EarlyStopping
+def learning_rate_scheduler(epoch):
+    return lr * (0.1 ** int(epoch / 10))
+import h5py as h5py
+model_history = model.fit(X, Y,
+                          batch_size = BATCH_SIZE,
+                          epochs = EPOCHS,
+                          validation_split = 0.2,
+                          verbose = 1, 
+                          callbacks = [LearningRateScheduler(learning_rate_scheduler),
+                                      ModelCheckpoint('model.h5', save_best_only=True),
+                                      EarlyStopping(monitor='val_acc', min_delta=0.00001, patience=5, \
+                                                     verbose=1, mode='auto')])
+import pandas as pd
+test_data = pd.read_csv('data/traffic_sign_dataset/GT-final_test.csv', sep =';' )
 
-# Evaluating the model on the testset
-metrics = Valid_model.val(split = 'test')
-# final results 
-print("precision(B): ", metrics.results_dict["metrics/precision(B)"])
-print("metrics/recall(B): ", metrics.results_dict["metrics/recall(B)"])
-print("metrics/mAP50(B): ", metrics.results_dict["metrics/mAP50(B)"])
-print("metrics/mAP50-95(B): ", metrics.results_dict["metrics/mAP50-95(B)"])
-# Path to the directory containing the images
-image_dir = '/kaggle/input/cardetection/car/test/images'  
+# Loading test data
+X_test = []
+y_test = []
+for file_name, class_id in zip(list(test_data['Filename']), list(test_data['ClassId'])):
+    img_path = os.path.join('data/traffic_sign_dataset/Final_Test/Images', file_name)
+    X_test.append(preprocess_images(io.imread(img_path)))
+    y_test.append(class_id)
+    
+X_test = np.array(X_test)
+y_test = np.array(y_test)
 
-# Get a list of all image files in the directory
-image_files = [os.path.join(image_dir, file) for file in os.listdir(image_dir) if file.endswith('.jpg')]
+# predict and evaluate
+y_predict = model.predict_classes(X_test)
+accuracy = np.sum(y_predict == y_test) / np.size(y_predict)
+print("Test accuracy = {}".format(accuracy))
+from keras.preprocessing.image import ImageDataGenerator
+from sklearn.model_selection import train_test_split
+X_train, X_val, Y_train, Y_val = train_test_split(X, Y, test_size =0.2, random_state = 42)
 
-# Randomly select 10 images from the directory
-random_images = random.sample(image_files, k=10)
+datagen = ImageDataGenerator(featurewise_center = False,
+                            featurewise_std_normalization = False,
+                            width_shift_range = 0.1,
+                            height_shift_range = 0.1,
+                            zoom_range =0.2,
+                            shear_range = 0.1,
+                            rotation_range = 10)
+datagen.fit(X_train)
+model = build_cnn_model()
 
-for image_path in random_images:
-    image = cv2.imread(image_path)  # Replace with your preferred method of reading the image
-    results = Final_model.predict([image], save=True, imgsz=416, conf=0.5, iou=0.7)
-    #results.append(result)
-# View results
-for i in range(2,12):
-    plt.imshow(plt.imread(f'/kaggle/working/runs/detect/train{i}/image0.jpg'))
-    plt.show()
-# Export the model
-video_model.export(format='onnx')
-# Convert mp4
-!ffmpeg -y -loglevel panic -i /kaggle/input/cardetection/video.mp4 output.mp4
-
-# Display the video
-Video("output.mp4", width=960)
-# Load a pr-trained model
-video_model = YOLO("yolov8n.pt")
- 
-# Use the model to detect signs
-video_model.predict(source="/kaggle/input/cardetection/video.mp4", show=True, save = True)
-# show result
-# Convert format
-!ffmpeg -y -loglevel panic -i /kaggle/working/runs/detect/predict/video.avi result_out.mp4
-
-# Display the video 
-Video("result_out.mp4", width=960)
+lr = 0.01
+sgd = SGD(lr=lr, decay=1e-6, momentum=0.9, nesterov=True)
+model.compile(loss='categorical_crossentropy',
+          optimizer=sgd,
+          metrics=['accuracy'])
+model_history = model.fit_generator(datagen.flow(X_train, Y_train, batch_size= BATCH_SIZE),
+                            steps_per_epoch=X_train.shape[0] / BATCH_SIZE,
+                            epochs= EPOCHS,
+                            validation_data=(X_val, Y_val),
+                            callbacks=[LearningRateScheduler(learning_rate_scheduler),
+                                       ModelCheckpoint('model_aug.h5',save_best_only=True),
+                                       EarlyStopping(monitor='val_acc', min_delta=0.00001, patience=5, \
+                                                     verbose=1, mode='auto')])
+# predict again and re-evaluate
+y_predict = model.predict_classes(X_test)
+accuracy = np.sum(y_predict == y_test) / np.size(y_predict)
+print("Test accuracy = {}".format(accuracy))

@@ -45,6 +45,9 @@ train_test_split(): Splits data into training and testing sets.
 
 Optimizers:
 
+an optimizer is an algorithm that is used to minimize or maximize a loss function or objective function. The goal of an optimizer is to find the optimal parameters for a model that result in the best performance on a given task.
+Optimizers work by iteratively updating the model parameters in a direction that reduces the loss function. The update rule is based on the gradient of the loss function with respect to the model parameters.
+
 Stochastic Gradient Descent (SGD): Updates model parameters based on the gradient of the loss function.
 Momentum: Adds a momentum term to SGD to help escape local minima.
 Nesterov Accelerated Gradient (NAG): A variant of SGD with a different momentum update rule.
@@ -58,6 +61,8 @@ Quasi-Hyperbolic Momentum (QHM): A variant of SGD with a quasi-hyperbolic moment
 
 Compilers:
 
+a compiler is a software tool that translates high-level code into low-level machine code that can be executed by a computer. Compilers are used to optimize the performance of AI/ML models by generating efficient machine code.
+
 TensorFlow: An open-source machine learning framework developed by Google.
 PyTorch: An open-source machine learning framework developed by Facebook.
 Keras: A high-level neural networks API that can run on top of TensorFlow, PyTorch, or Theano.
@@ -65,6 +70,8 @@ CNTK: A deep learning framework developed by Microsoft Research.
 MXNet: An open-source deep learning framework developed by Amazon.
 
 Activation Functions:
+
+an activation function is a mathematical function that is applied to the output of a layer to introduce non-linearity into the model. Activation functions are used to enable the model to learn complex relationships between the input and output data.
 
 Sigmoid: Maps the input to a value between 0 and 1.
 ReLU (Rectified Linear Unit): Maps all negative values to 0 and all positive values to the same value.
@@ -75,6 +82,8 @@ Swish: A self-gated activation function that can be used as a drop-in replacemen
 GELU (Gaussian Error Linear Unit): A activation function that is similar to ReLU but with a smoother curve.
 
 Layers:
+
+a layer is a component of a neural network that processes input data and produces output data. Layers are the building blocks of neural networks, and they can be combined in various ways to create complex models.
 
 Dense (Fully Connected) Layer: A layer where every input is connected to every output.
 Convolutional Layer: A layer that applies a convolution operation to the input data.

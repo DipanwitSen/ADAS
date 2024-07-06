@@ -1,150 +1,287 @@
-import numpy as np
-import os
-import glob
+from torch.utils.data import Dataset, DataLoader, random_split
+from typing import Any, Tuple, Optional, Callable
+import PIL
+import csv
+import pathlib
+import torch
+import torch.nn as nn
+from torch.optim import Adam, lr_scheduler
+from torchvision.transforms.v2 import ToTensor, Resize, Compose, ColorJitter, RandomRotation, AugMix, RandomCrop, GaussianBlur, RandomEqualize, RandomHorizontalFlip, RandomVerticalFlip
 import matplotlib.pyplot as plt
-from skimage import color, exposure, transform, io
-NUM_CLASSES = 43
-IMG_SIZE = 48
-TRAINING_PATH = 'data/traffic_sign_dataset/Final_Training/Images/'
-TEST_PATH = 'data/traffic_sign_dataset/Final_Test/Images/'
-BATCH_SIZE = 32
-EPOCHS = 30
-def correct_all_paths(img_paths):
-    new_paths = []
-    for path in img_paths:
-        path = path.replace('\\', '/')
-        new_paths.append(path)
-    return new_paths
-img_paths = glob.glob(os.path.join(TRAINING_PATH, '*/*.ppm'))
-img_paths = correct_all_paths(img_paths)
-np.random.shuffle(img_paths)
-for i in range(0, 9):
-    plt.subplot(330 + 1 + i)
-    plt.imshow(io.imread(img_paths[i], cmap=plt.get_cmap('gray')))
-#Show the plot
-plt.show()
-def preprocess_images(img):
-    # return image in HSV format
-    hsv = color.rgb2hsv(img)
-    # return image after histogram equilization
-    hsv[:, :, 2] = exposure.equalize_hist(hsv[:, :, 2])
-    img = color.hsv2rgb(hsv)
-    
-    # resizing image to fixed dimension
-    min_side = min(img.shape[:-1])
-    center =img.shape[0] // 2, img.shape[1] // 2
-    img = img[center[0] - min_side // 2: center[0] + min_side // 2,
-              center[1] - min_side // 2: center[0] + min_side // 2,
-              :]
-    img = transform.resize(img,(IMG_SIZE, IMG_SIZE), mode = 'constant')
+import pickle
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+class GTSRB(Dataset):
+    def __init__(self,
+                 root: str,
+                 split: str,
+                 transform: Optional[Callable] = None):
+       
+        
+        
+        self.base_folder = pathlib.Path(root)
+        self.csv_file = self.base_folder / ('Train.csv' if split =='train' else 'Test.csv')
+        
+        
+        with open('/'+str(self.csv_file)) as csvfile:
+           samples = [('/'+str(self.base_folder / row['Path']),int(row['ClassId'])) 
+            for row in csv.DictReader(csvfile,delimiter=',',skipinitialspace=True)
+                ]
 
-    return img
-def get_class(img_path):
-    return int(img_path.split('/')[-2])
-images = []
-labels = []
-for img_path in img_paths:
-    img = preprocess_images(io.imread(img_path))
-    label = get_class(img_path)
-    images.append(img)
-    labels.append(label)
-X = np.array(images, dtype = 'float32')
-Y = np.eye(NUM_CLASSES, dtype = 'uint8')[labels]
-for i in range(0, 9):
-    plt.subplot(330 + 1 + i)
-    plt.imshow(images[i], cmap=plt.get_cmap('gray'))
-#Show the plot
-plt.show()
-from keras.models import Sequential
-from keras.layers.core import Dropout, Dense, Activation, Flatten
-from keras.layers.convolutional import Conv2D
-from keras.layers.pooling import MaxPooling2D
-from keras.optimizers import SGD
-def build_cnn_model():
-    model = Sequential() 
-    model.add(Conv2D(32, (3, 3), padding ='same', input_shape = (IMG_SIZE, IMG_SIZE, 3), activation = 'relu'))
-    model.add(Conv2D(32, (3, 3), activation = 'relu'))
-    model.add(MaxPooling2D(pool_size = (2, 2)))
-    model.add(Dropout(0.2))
-    
-    model.add(Conv2D(64, (3, 3), padding ='same', activation = 'relu'))
-    model.add(Conv2D(64, (3, 3), activation = 'relu'))
-    model.add(MaxPooling2D(pool_size = (2, 2)))
-    model.add(Dropout(0.2))
-    
-    model.add(Conv2D(128, (3, 3), padding ='same', activation = 'relu'))
-    model.add(Conv2D(128, (3, 3), activation = 'relu'))
-    model.add(MaxPooling2D(pool_size = (2, 2)))
-    model.add(Dropout(0.2))
-    
-    model.add(Flatten())
-    model.add(Dense(512, activation = 'relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(NUM_CLASSES, activation = 'softmax'))
-    return model
-    model = build_cnn_model()
-lr = 0.01
-sgd = SGD(lr = lr, decay = 1e-6, momentum = 0.9, nesterov = True) 
-model.compile(loss = 'categorical_crossentropy', optimizer = sgd, metrics = ['accuracy'])
-from keras.callbacks import LearningRateScheduler, ModelCheckpoint, EarlyStopping
-def learning_rate_scheduler(epoch):
-    return lr * (0.1 ** int(epoch / 10))
-import h5py as h5py
-model_history = model.fit(X, Y,
-                          batch_size = BATCH_SIZE,
-                          epochs = EPOCHS,
-                          validation_split = 0.2,
-                          verbose = 1, 
-                          callbacks = [LearningRateScheduler(learning_rate_scheduler),
-                                      ModelCheckpoint('model.h5', save_best_only=True),
-                                      EarlyStopping(monitor='val_acc', min_delta=0.00001, patience=5, \
-                                                     verbose=1, mode='auto')])
-import pandas as pd
-test_data = pd.read_csv('data/traffic_sign_dataset/GT-final_test.csv', sep =';' )
 
-# Loading test data
-X_test = []
-y_test = []
-for file_name, class_id in zip(list(test_data['Filename']), list(test_data['ClassId'])):
-    img_path = os.path.join('data/traffic_sign_dataset/Final_Test/Images', file_name)
-    X_test.append(preprocess_images(io.imread(img_path)))
-    y_test.append(class_id)
+        self.samples = samples
+        self.split = split
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.samples)
     
-X_test = np.array(X_test)
-y_test = np.array(y_test)
+    def __getitem__(self, index: int) -> Tuple:
+        path,classId =  self.samples[index]
+        sample = PIL.Image.open(path).convert('RGB')
+        if self.transform is not None:
+            sample = self.transform(sample)
+        return sample,classId
+     train_transforms = Compose([
+    ColorJitter(brightness=1.0, contrast=0.5, saturation=1, hue=0.1),
+    RandomEqualize(0.4),
+    AugMix(),
+    RandomHorizontalFlip(0.3),
+    RandomVerticalFlip(0.3),
+    GaussianBlur((3,3)),
+    RandomRotation(30),
 
-# predict and evaluate
-y_predict = model.predict_classes(X_test)
-accuracy = np.sum(y_predict == y_test) / np.size(y_predict)
-print("Test accuracy = {}".format(accuracy))
-from keras.preprocessing.image import ImageDataGenerator
-from sklearn.model_selection import train_test_split
-X_train, X_val, Y_train, Y_val = train_test_split(X, Y, test_size =0.2, random_state = 42)
+    Resize([50,50]),
+    ToTensor(),
+    
+])
+validation_transforms =  Compose([
+    Resize([50,50]),
+    ToTensor(),
+    
+])
+def train_test_split(dataset,train_size):
 
-datagen = ImageDataGenerator(featurewise_center = False,
-                            featurewise_std_normalization = False,
-                            width_shift_range = 0.1,
-                            height_shift_range = 0.1,
-                            zoom_range =0.2,
-                            shear_range = 0.1,
-                            rotation_range = 10)
-datagen.fit(X_train)
-model = build_cnn_model()
+    train_size = int(train_size * len(dataset))
+    test_size = int(len(dataset) - train_size)
+    return random_split(dataset,[train_size,test_size])
+dataset = GTSRB(root='./kaggle/input/gtsrb-german-traffic-sign',split="train")
+train_set,validation_set = train_test_split(dataset,train_size=0.8)
+print(f'training size : {len(train_set)}, Validation size : {len(validation_set)}')
+plt.figure(figsize=(25,25))
+for i in range(1,26):
+    input,label = train_set[i]
+    plt.subplot(5,5,i)
+    plt.title(label)
+    plt.imshow(input)
+train_set.dataset.transform = train_transforms
+validation_set.dataset.transform = validation_transforms
+BATCH_SIZE = 64
+train_loader = DataLoader(dataset=train_set,batch_size=BATCH_SIZE,shuffle=True)
+validation_loader = DataLoader(dataset=validation_set,batch_size=BATCH_SIZE)
+class GTSRB_MODEL(nn.Module):
+    def __init__(self,input_dim,output_dim):
+        super(GTSRB_MODEL,self).__init__()
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        
+      
+        self.metrics = {}
+        
+        self.flatten = nn.Flatten()
+        
+        self.dropout2 = nn.Dropout(0.2)
+        self.dropout3 = nn.Dropout(0.3)
+       
 
-lr = 0.01
-sgd = SGD(lr=lr, decay=1e-6, momentum=0.9, nesterov=True)
-model.compile(loss='categorical_crossentropy',
-          optimizer=sgd,
-          metrics=['accuracy'])
-model_history = model.fit_generator(datagen.flow(X_train, Y_train, batch_size= BATCH_SIZE),
-                            steps_per_epoch=X_train.shape[0] / BATCH_SIZE,
-                            epochs= EPOCHS,
-                            validation_data=(X_val, Y_val),
-                            callbacks=[LearningRateScheduler(learning_rate_scheduler),
-                                       ModelCheckpoint('model_aug.h5',save_best_only=True),
-                                       EarlyStopping(monitor='val_acc', min_delta=0.00001, patience=5, \
-                                                     verbose=1, mode='auto')])
-# predict again and re-evaluate
-y_predict = model.predict_classes(X_test)
-accuracy = np.sum(y_predict == y_test) / np.size(y_predict)
-print("Test accuracy = {}".format(accuracy))
+        self.relu = nn.ReLU()
+        self.maxpool = nn.MaxPool2d(2)
+        
+
+        self.conv1 = nn.Conv2d(in_channels=3,out_channels=32,kernel_size=3,padding=1)
+        self.conv2 = nn.Conv2d(in_channels=32,out_channels=64,kernel_size=3,padding=1)
+        self.batchnorm1 = nn.BatchNorm2d(64)
+
+        self.conv3 = nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3,padding=1)
+        self.conv4 = nn.Conv2d(in_channels=128,out_channels=256,kernel_size=3,padding=1)
+        self.batchnorm2 = nn.BatchNorm2d(256)
+
+
+        
+        self.conv5 = nn.Conv2d(in_channels=256,out_channels=512,kernel_size=3)
+        self.conv6 = nn.Conv2d(in_channels=512,out_channels=1024,kernel_size=3)
+        self.batchnorm3 = nn.BatchNorm2d(1024)
+        
+       
+       
+
+        self.l1 = nn.Linear(1024*4*4,512)
+        self.l2 = nn.Linear(512,128)
+        self.batchnorm4 = nn.LayerNorm(128)
+        self.l3 = nn.Linear(128,output_dim)
+        
+        
+    def forward(self,input):
+        
+        conv = self.conv1(input)
+        conv = self.conv2(conv)
+        batchnorm = self.relu(self.batchnorm1(conv))
+        maxpool = self.maxpool(batchnorm)
+
+        conv = self.conv3(maxpool)
+        conv = self.conv4(conv)
+        batchnorm = self.relu(self.batchnorm2(conv))
+        maxpool = self.maxpool(batchnorm)
+
+        conv = self.conv5(maxpool)
+        conv = self.conv6(conv)
+        batchnorm = self.relu(self.batchnorm3(conv))
+        maxpool = self.maxpool(batchnorm)
+        
+        
+        
+        
+       
+        
+        flatten = self.flatten(maxpool)
+        
+        dense_l1 = self.l1(flatten)
+        dropout = self.dropout3(dense_l1)
+        dense_l2 = self.l2(dropout)
+        batchnorm = self.batchnorm4(dense_l2)
+        dropout = self.dropout2(batchnorm)
+        output = self.l3(dropout)
+        
+       
+        return output
+    
+    def training_metrics(self,positives,data_size,loss):
+        acc = positives/data_size
+        return loss,acc
+    
+    def validation_metrics(self,validation_data,loss_function):
+       data_size = len(validation_data)
+       correct_predictions = 0
+       total_samples = 0
+       val_loss = 0
+
+       model = self.eval()
+       with torch.no_grad() : 
+        for step,(input,label) in enumerate(validation_data):
+            input,label = input.to(device),label.to(device)
+            prediction = model.forward(input)
+            loss = loss_function(prediction,label)
+            val_loss = loss.item()
+            _,predicted = torch.max(prediction,1)
+            correct_predictions += (predicted == label).sum().item()
+            total_samples += label.size(0)
+
+       val_acc = correct_predictions/total_samples
+
+       return val_loss,val_acc
+
+    def history(self):
+        return self.metrics
+
+            
+
+
+    def compile(self,train_data,validation_data,epochs,loss_function,optimizer,learning_rate_scheduler):
+        val_acc_list = []
+        val_loss_list = []
+
+        train_acc_list = []
+        train_loss_list = []
+
+        learning_rate_list = []
+
+        print('training started ...')
+        STEPS = len(train_data)
+        for epoch in range(epochs):
+            lr = optimizer.param_groups[0]["lr"]
+            learning_rate_list.append(lr)
+            correct_predictions = 0
+            total_examples = 0
+            loss = 0
+            with tqdm.trange(STEPS) as progress:
+
+                for step,(input,label) in enumerate(train_loader):
+
+                    input,label = input.to(device),label.to(device)
+                    prediction = self.forward(input)
+
+                    _, predicted = torch.max(prediction, 1)
+                    correct_predictions += (predicted == label).sum().item()
+                    total_examples += label.size(0)
+                    l = loss_function(prediction,label)
+                    loss = l.item()
+                    l.backward()
+                    optimizer.step()
+                    optimizer.zero_grad()
+
+                    progress.colour = 'green'
+                    progress.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Learning Rate [{lr}], Loss [{"{:.4f}".format(l)}], Accuracy [{"{:.4f}".format(correct_predictions/total_examples)}]'
+                    progress.update(1)
+
+            training_loss,training_acc = self.training_metrics(correct_predictions,total_examples,loss)
+            train_acc_list.append(training_acc)
+            train_loss_list.append(training_loss)
+
+            val_loss, val_acc = self.validation_metrics(validation_data,loss_function)
+            val_acc_list.append(val_acc)
+            val_loss_list.append(val_loss)
+            
+            print(f'val_accuracy [{val_acc}], val_loss [{val_loss}]')
+
+            
+            learning_rate_scheduler.step()
+        
+        metrics_dict = {
+                'train_acc':train_acc_list,
+                'train_loss':train_loss_list,
+                'val_acc':val_acc_list,
+                'val_loss':val_loss_list,
+                'learning_rate':optimizer.param_groups[0]["lr"]
+            }
+        self.metrics = metrics_dict
+        print('training complete !')    
+
+        import tqdm
+EPOCHS = 20
+LEARNING_RATE = 0.0008
+INPUT_DIM = 3*50*50
+OUTPUT_DIM = 43
+model = GTSRB_MODEL(INPUT_DIM,OUTPUT_DIM).to(device)
+
+optimizer = Adam(params=model.parameters(),lr=LEARNING_RATE)
+lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=0.5,total_iters=10)
+loss = nn.CrossEntropyLoss()
+model.compile(train_data=train_loader,validation_data=validation_loader,epochs=EPOCHS,loss_function=loss,optimizer=optimizer,learning_rate_scheduler=lr_s)
+transforms = Compose([
+    Resize([50,50]),
+    ToTensor(),
+    
+])
+
+testdata = GTSRB(root='./kaggle/input/gtsrb-german-traffic-sign',split='test',transform=transforms)
+print('testing size :',len(testdata))
+test_dataloader = DataLoader(testdata)
+from sklearn.metrics import accuracy_score
+
+y_pred = []
+y_true = []
+model = model.eval().to(device)
+with tqdm.tqdm(colour='red',total=len(test_dataloader)) as progress:
+  
+  with torch.no_grad() : 
+    for id,(input,label) in enumerate(iter(test_dataloader)):
+        input,label = input.to(device),label.to(device)
+        y_true.append(label.item())
+        prediction = model.forward(input)
+        _,prediction = torch.max(prediction,1)
+        y_pred.append(prediction.item())
+        
+        progress.desc = f'Test Accuracy : {accuracy_score(y_true,y_pred)} '
+        progress.update(1)
+        
+       
+    

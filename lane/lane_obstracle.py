@@ -55,9 +55,11 @@ def draw_lane_lines(image, binary_warped, left_fit, right_fit, Minv, curvature, 
     newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
     result = cv2.addWeighted(image, 1, newwarp, 0.3, 0)
 
+     # Extract individual curvature values
+    left_curverad, right_curverad = curvature
+
     # Display curvature
-    left_curvature, right_curvature = curvature
-    curvature_text = "Curvature: {:.2f} m^-1, {:.2f} m^-1".format(left_curvature, right_curvature)
+    curvature_text = "Curvature: {:.2f} m^-1".format(left_curverad, right_curverad)
     cv2.putText(result, curvature_text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
     # Display steering angle
@@ -70,7 +72,7 @@ def draw_lane_lines(image, binary_warped, left_fit, right_fit, Minv, curvature, 
         cv2.putText(result, obstacles_text, (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
     # Display vehicle offset
-    offset_text = "Vehicle Offset: {:.2f} m, {:.2f} m".format(offset[0], offset[1])
+    offset_text = "Vehicle Offset: {:.2f} m".format(offset)
     cv2.putText(result, offset_text, (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
     # Display velocity
@@ -337,10 +339,9 @@ if __name__ == "__main__":
         plt.imshow(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB))
         plt.show()
     elif choice == 2:
-        if choice == 2:
-            video_path = input("Enter the video path: ")
-            process_video(video_path, src_points, dst_points, output_dir)
+        video_path = input("Enter the video path: ")
+        process_video(video_path, src_points, dst_points, output_dir)
     elif choice == 3:
         process_webcam(src_points, dst_points, output_dir)
     else:
-        print("Invalid choice. Please restart and select a valid option.")
+        print("Invalid choice. Please restart and select a valid option.")

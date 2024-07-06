@@ -1,0 +1,28 @@
+abstract
+This work presents a framework for encoding and visualizing the future motion of objects detected in video streams or images. The system uses a combination of YOLOv8 for detection and Kalman Filter for state estimation and prediction. By combining these techniques, the system can detect the object in real time, predict its future trajectory, and make this trajectory visible in the video
+
+components and methods
+Object detection with YOLOv8:
+
+YOLOv8 (You Only Look Once version 8) is used to identify the objects in the input frame. The model processes the frame and determines the bounding box coordinates of the object of interest.
+Kalman filter for state statistics:
+
+A Kalman filter is initialized to predict the future state of the object based on the current measurement of the object.
+The filter uses a state transition matrix and a measurement matrix to estimate the position of an object.
+It predicts the next position of the object and corrects this prediction with actual measurements from YOLOv8.
+Future Road Generation:
+
+Depending on the object’s current position and perceived motion energy, several possible future mechanisms are generated, such as random uncertainties and environmental factors (e.g., gravity).
+These methods are performed to simulate possible future movements and to assume uncertainty.
+Method of Integration:
+
+The generated multiple trajectories are combined into a single predicted trajectory by averaging the trajectory coefficients at each future point.
+This results in a path that represents the most likely path the object will take in the future.
+Image credits:
+
+The predicted path and possible future paths are drawn on the video images.
+Parabolic and hyperbolic trajectories have also been drawn for additional observations.
+
+conclusion
+The system provides comprehensive solutions for real-time object detection and future trajectory prediction using a combination of deep learning and probabilistic filtering techniques.
+The system can be used in various applications such as robotics, surveillance, and autonomous driving

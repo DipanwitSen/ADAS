@@ -1,0 +1,12 @@
+What is Kalman Filter?
+It is an iterative mathematical process that uses a set of equations and consecutive data inputs to quickly estimate the true value ,position, velocity , etc of the object being measured, when the measured values contain unpredicted of random error ,uncertainty ,or variation.
+Some formulas of Kalman filter are :
+Kalman gain =KG
+Error in estimate =Eest
+Error in measurement =Emea
+Current estimate=ESTt
+previous estimate=ESTt-1
+Measurement=MEA
+KG=Eest/(Eest+Emea)
+ESTt=ESTt-1 + KG[MEA-ESTt-1]
+ESRt=(Emea)(Eest-1)/((Emea)+(Eest-1))

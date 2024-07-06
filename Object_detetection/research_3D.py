@@ -1,4 +1,7 @@
 #KITTI DATA CONFIGURE
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
 import math
 import numpy as np
 # Car and Van ==> Car class
@@ -577,7 +580,7 @@ class Cutout(object):
 
         return img, targets
 # DATA UTILITY
-from __future__ import print_function
+
 import os
 import sys
 
@@ -1636,7 +1639,7 @@ def plot_lr_scheduler(optimizer, scheduler, num_epochs=300, save_dir='', lr_type
     plt.tight_layout()
     plt.savefig(os.path.join(save_dir, 'LR_{}.png'.format(lr_type)), dpi=200)
   # EVALUATION
-from __future__ import division
+
 import os
 import sys
 
@@ -1799,7 +1802,6 @@ def convert_det_to_real_values(detections, num_classes=3):
 
     return np.array(kitti_dets)
   # VISUALIZATION
-from __future__ import print_function
 import os
 import sys
 
@@ -1996,18 +1998,18 @@ class Demo_KittiDataset(Dataset):
         # assert os.path.isfile(lidar_file)
         return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
     # DATA WEIGHT
-!pip install wget
-!mkdir -p ./dataset/kitti/demo
-!mkdir -p ./dataset/kitti/ImageSets
 
-!wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/demo/calib.txt -P ./dataset/kitti/demo/
-!wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/ImageSets/test.txt -P ./dataset/kitti/ImageSets/
-!wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/ImageSets/train.txt -P ./dataset/kitti/ImageSets/
-!wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/ImageSets/trainval.txt -P ./dataset/kitti/ImageSets/
-!wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/ImageSets/val.txt -P ./dataset/kitti/ImageSets/
+# mkdir -p ./dataset/kitti/demo
+# mkdir -p ./dataset/kitti/ImageSets
+
+## wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/demo/calib.txt -P ./dataset/kitti/demo/
+## wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/ImageSets/test.txt -P ./dataset/kitti/ImageSets/
+## !wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/ImageSets/train.txt -P ./dataset/kitti/ImageSets/
+## !wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/ImageSets/trainval.txt -P ./dataset/kitti/ImageSets/
+## !wget https://raw.githubusercontent.com/maudzung/SFA3D/master/dataset/kitti/ImageSets/val.txt -P ./dataset/kitti/ImageSets/
 import argparse
 import sys
-import os
+#import os
 import warnings
 import zipfile
 
@@ -2111,7 +2113,7 @@ def write_credit(img, org_author=(500, 400), text_author='github.com/maudzung', 
 
     cv2.putText(img, text_author, org_author, font, fontScale, color, thickness, cv2.LINE_AA)
     cv2.putText(img, 'Speed: {:.1f} FPS'.format(fps), org_fps, font, fontScale, color, thickness, cv2.LINE_AA)
-  import os
+import os
 import sys
 import math
 
@@ -2259,9 +2261,7 @@ class Compute_Loss(nn.Module):
 
         return total_loss, loss_stats
  # FPN RESNET
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
 
 import os
 
@@ -2805,8 +2805,8 @@ def validate(val_dataloader, model, configs):
 
     return losses.avg
   # Download weights
-!mkdir -p ./checkpoints/fpn_resnet_18
-!wget https://github.com/maudzung/SFA3D/raw/master/checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth -P ./checkpoints/fpn_resnet_18/
+##!mkdir -p ./checkpoints/fpn_resnet_18
+##!wget https://github.com/maudzung/SFA3D/raw/master/checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth -P ./checkpoints/fpn_resnet_18/
 import sys
 import os
 import warnings
@@ -2852,7 +2852,7 @@ def process_data(source_type, source_path=None):
         download_and_unzip(configs.dataset_dir, download_url)
 
     model = create_model(configs)
-    assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
+    ## assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
     model.load_state_dict(torch.load(configs.pretrained_path, map_location='cpu'))
     
     # Set model device
@@ -2942,14 +2942,8 @@ def process_data(source_type, source_path=None):
 if __name__ == "__main__":
     # Instead of argparse, let's define the parameters directly for Kaggle environment
     source_type = 'video'  # Change to 'kitti' or 'webcam' as needed
-    source_path = '/path/to/your/video/file'  # Set to None for 'kitti' or 'webcam'
+    ## source_path = '/path/to/your/video/file'  # Set to None for 'kitti' or 'webcam'
+    source_path = "C:/Users/KIIT/Downloads/car.mp4" 
+      # Set to None for 'kitti' or 'webcam'
 
     process_data(source_type, source_path)
-  
-  
-      
-      
-      
-      
-  
-  

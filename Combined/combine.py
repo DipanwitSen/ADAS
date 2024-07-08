@@ -92,11 +92,11 @@ def draw_lane_lines(image, binary_warped, left_fit, right_fit, Minv, curvature, 
         cv2.circle(result, (pred_x, pred_y), 5, (0, 255, 255), -1)
         cv2.putText(result, "Prediction", (pred_x, pred_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-        warning_y = 500
-        for label, ttc in collision_warnings:
-            warning_text = f"WARNING: {label} - Time to collision: {ttc:.2f}s"
-            cv2.putText(result, warning_text, (50, warning_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            warning_y += 50
+    warning_y = 500
+    for label, ttc in collision_warnings:
+        warning_text = f"WARNING: {label} - Time to collision: {ttc:.2f}s"
+        cv2.putText(result, warning_text, (50, warning_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        warning_y += 50
 
     return result
 
@@ -326,7 +326,8 @@ def process_webcam(yolo, src_points, dst_points):
         ret, frame = cap.read()
         if not ret:
             break
-        result, detected_objects, kalman_predictions, image, binary_warped, left_fit, right_fit, Minv, curvature, offset, steering_angle, obstacles, velocity, acceleration, brake, drive_mode, lane_keeping, collision_warnings = process_image(frame, yolo, src_points, dst_points)
+
+        result = process_image(frame, yolo, src_points, dst_points)
 
         cv2.imshow('Webcam Output', result)
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -334,6 +335,7 @@ def process_webcam(yolo, src_points, dst_points):
 
     cap.release()
     cv2.destroyAllWindows()
+
 
 def main():
     choice = input("Choose input type (image, video, webcam): ")

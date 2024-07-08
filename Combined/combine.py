@@ -292,7 +292,20 @@ def process_video(video_path, yolo, src_points, dst_points):
         ret, frame = cap.read()
         if not ret:
             break
-        result = process_image(frame, yolo, src_points, dst_points)
+        result, detected_objects, kalman_predictions, image, binary_warped, left_fit, right_fit, Minv, curvature, offset, steering_angle, obstacles, velocity, acceleration, brake, drive_mode, lane_keeping = process_image(frame, yolo, src_points, dst_points)
+        collision_warnings = []
+        for (bbox, label), pred in zip(detected_objects, kalman_predictions):
+            object_distance = bbox[1]  # Assuming y-coordinate represents distance
+            relative_velocity = velocity - pred[1][0]  # Assuming pred[1][0] is object's velocity
+            time_to_collision = calculate_time_to_collision(object_distance, relative_velocity)
+
+            if time_to_collision <= 5:  # 5 seconds threshold
+                collision_warnings.append((label, time_to_collision))
+
+        result = draw_lane_lines(image, binary_warped, left_fit, right_fit, Minv, curvature, offset, steering_angle,
+                                 obstacles, velocity, acceleration, brake, drive_mode, lane_keeping, detected_objects,
+                                 kalman_predictions, collision_warnings)
+
         out.write(result)
 
         cv2.imshow('Output', result)
@@ -301,6 +314,25 @@ def process_video(video_path, yolo, src_points, dst_points):
 
     cap.release()
     out.release()
+    cv2.destroyAllWindows()
+
+def process_webcam(yolo, src_points, dst_points):
+    cap = cv2.VideoCapture(0)  # Open default camera (webcam)
+    if not cap.isOpened():
+        print("Error: Could not open webcam.")
+        return
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        result, detected_objects, kalman_predictions, image, binary_warped, left_fit, right_fit, Minv, curvature, offset, steering_angle, obstacles, velocity, acceleration, brake, drive_mode, lane_keeping, collision_warnings = process_image(frame, yolo, src_points, dst_points)
+
+        cv2.imshow('Webcam Output', result)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
     cv2.destroyAllWindows()
 
 def main():
